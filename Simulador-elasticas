@@ -1,0 +1,108 @@
+import pygame, random 
+import numpy as np
+import pygame.gfxdraw
+
+
+class Environment(): 
+    def __init__(self, DIM, dt):
+        self.DIM = DIM
+        self.dt = dt
+        self.particles = []
+
+    def update(self):
+        for p1 in self.particles:
+            p1.stateUpdate()
+            self.bounce(p1)
+            for p2 in self.particles:
+                if p1 != p2:
+                    self.elasticoCol(p1, p2)
+
+    def adParticle(self, p):
+        self.particles.append(p)
+
+    
+    def bounce(self, p):
+        for p in self.particles:
+            i = 0
+            for x in p.X[0]:
+                if x > self.DIM[i]-p.raio:
+                    dist = p.raio-(self.DIM[i]-x)
+                    p.adPosi(-dist)
+                    tmp = np.zeros(np.size(p.V))
+                    tmp[i] = -2*p.V[0][i]
+                    p.adVeloc(tmp)
+                elif x < p.raio: 
+                    dist = p.raio-x
+                    p.adPosi(dist)
+                    tmp = np.zeros(np.size(p.X))
+                    tmp[i] = -2*p.V[0][i]
+                    p.adVeloc(tmp)
+                i += 1
+    
+    def elasticoCol(self, p1, p2):
+        dX = p1.X-p2.X
+        dist = np.sqrt(np.sum(dX**2))
+        if dist < p1.raio+p2.raio:
+            offset = dist-(p1.raio+p2.raio)
+            p1.adPosi((-dX/dist)*offset/2)
+            p2.adPosi((dX/dist)*offset/2)
+            total_massa = p1.massa+p2.massa
+            dv1 = -2*p2.massa/total_massa*np.inner(p1.V-p2.V,p1.X-p2.X)/np.sum((p1.X-p2.X)**2)*(p1.X-p2.X)
+            dv2 = -2*p1.massa/total_massa*np.inner(p2.V-p1.V,p2.X-p1.X)/np.sum((p2.X-p1.X)**2)*(p2.X-p1.X)
+            p1.adVeloc(dv1)
+            p2.adVeloc(dv2)
+
+    def plasticCollision(self):
+        pass
+
+class Particle(): 
+    def __init__(self, env, X, V,raio, massa):
+        self.env = env
+        self.X = X
+        self.V = V
+        self.raio = raio
+        self.massa = massa
+        self.cor = (110, 10, int(random.uniform(0,255)))
+
+    def adVeloc(self, vel):
+        self.V += vel
+    
+    def adPosi(self, pos):
+        self.X += pos
+
+    def stateUpdate(self): 
+        self.X += self.V*self.env.dt
+
+
+DIM = np.asarray([750, 750])
+dt = 0.01
+env = Environment(DIM, dt)
+
+pygame.init()
+screen = pygame.display.set_mode((DIM[0], DIM[1]))
+
+number_of_particles= 50
+
+
+
+for n in range(number_of_particles):
+    raio = np.random.randint(10, 20)
+    massa = raio**3
+    X = np.random.rand(1, 2)*(DIM-raio)+raio
+    V = np.random.rand(1, 2)*75
+    particle = Particle(env, X, V, raio, massa)
+    env.adParticle(particle)
+
+def display(env):
+    for p in env.particles:
+        pygame.gfxdraw.filled_circle(screen, int(p.X[0][0]), int(p.X[0][1]), p.raio, p.cor)
+
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    screen.fill([255, 255, 255])
+    env.update()
+    display(env)
+    pygame.display.flip()
